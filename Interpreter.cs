@@ -113,6 +113,17 @@ namespace TTL
                                 {
                                     Console.WriteLine("error : white space");
                                 }*/
+                                foreach (string token in tokens)
+                                {
+                                    if (token.Contains("//"))
+                                    {
+                                        continue;
+                                    }
+                                    else if (tokens.Contains("#"))
+                                    {
+                                        continue;
+                                    }
+                                }
                             }
                         }
                     }

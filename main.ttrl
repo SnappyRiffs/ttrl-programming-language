@@ -1,3 +1,3 @@
 string name arden
-
-print name
+#you can add a string variable like above string variablename content of variable
+print name #name hello
