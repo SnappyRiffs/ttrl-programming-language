@@ -1,10 +1,50 @@
+// --- STRING VARIABLES ---
 string name arden
-print name
-name a
-print name
+print name       // prints: arden
+
+name a           // re-assigns name
+print name       // prints: a
+
+// --- INT VARIABLES ---
 int age 20
-print age
-age 10
-print age
+print age        // prints: 20
+
+age 10           // re-assigns age
+print age        // prints: 10
+
+// --- FLOAT VARIABLES ---
 float random 10.2 + 1.7
-print random
+print random     // prints: 11.9
+
+// --- BOOL VARIABLES ---
+bool isAlive true
+print isAlive    // prints: true
+
+bool isDead false
+print isDead     // prints: false
+
+// --- BOOL OPERATORS ---
+bool result isAlive && isDead
+print result     // prints: false
+
+bool result2 isAlive || isDead
+print result2    // prints: true
+
+bool result3 isAlive xor isDead
+print result3    // prints: true
+
+bool result4 !isAlive
+print result4    // prints: false
+
+bool result5 isAlive == isDead
+print result5    // prints: false
+
+bool result6 isAlive != isDead
+print result6    // prints: true
+
+// --- COMBINED EXPRESSIONS ---
+bool combo isAlive && !isDead
+print combo      // prints: true
+
+bool combo2 isAlive || isDead && false
+print combo2     // demonstrates operator precedence
