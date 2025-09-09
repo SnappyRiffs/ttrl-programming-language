@@ -1,4 +1,10 @@
-int num 30
-#you can do this
-math 2 + 1 - 4 + num
-print bye
+string name arden
+print name
+name a
+print name
+int age 20
+print age
+age 10
+print age
+float random 10.2 + 1.7
+print random
