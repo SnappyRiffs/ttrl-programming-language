@@ -2,6 +2,9 @@
 string name arden
 print name       // prints: arden
 
+string new 123
+print new
+
 name a           // re-assigns name
 print name       // prints: a
 
