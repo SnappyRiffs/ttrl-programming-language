@@ -8,15 +8,6 @@ namespace TTRL
         // Entry point of the application
         static void Main(string[] args)
         {
-            // Create and start the app
-            App app = new App();
-        }
-    }
-
-    class App
-    {
-        public App()
-        {
             // Start the interpreter when the App is created
             Interpreter.Start();
 
