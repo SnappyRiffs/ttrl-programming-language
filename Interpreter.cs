@@ -60,12 +60,13 @@ namespace TTRL
                         else if (float_variables.ContainsKey(tokens[1]))
                             result = float_variables[tokens[1]].ToString();
                         else if (bool_variables.ContainsKey(tokens[1]))
-                            result = bool_variables[tokens[1]].ToString().ToLower(); // print bool as "true"/"false"
+                            result = bool_variables[tokens[1]].ToString().ToLower();
                         else
                             result = string.Join(' ', tokens.Skip(1)); // print raw text
 
                         Console.WriteLine(result);
                     }
+
                     // STRING declaration/assignment
                     else if (tokens[0] == "string" && tokens.Length > 2)
                     {
@@ -74,24 +75,25 @@ namespace TTRL
                     // INT declaration/assignment
                     else if (tokens[0] == "int" && tokens.Length > 2)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(2));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(2));
+                        string result = MathFunctions.EvaluateStack(stack);
                         int_variables[tokens[1]] = int.Parse(result);
                     }
                     // FLOAT declaration/assignment
                     else if (tokens[0] == "float" && tokens.Length > 2)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(2));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(2));
+                        string result = MathFunctions.EvaluateStack(stack);
                         float_variables[tokens[1]] = float.Parse(result);
                     }
                     // BOOL declaration/assignment
                     else if (tokens[0] == "bool" && tokens.Length > 1)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                        string result = MathFunctions.EvaluateStack(stack);
                         bool_variables[tokens[1]] = bool.Parse(result); // parse string "true"/"false"
                     }
+
                     // Assign to existing string variable
                     else if (string_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
                     {
@@ -100,35 +102,38 @@ namespace TTRL
                     // Assign to existing int variable
                     else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                        string result = MathFunctions.EvaluateStack(stack);
                         int_variables[tokens[0]] = int.Parse(result);
                     }
                     // Assign to existing float variable
                     else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                        string result = MathFunctions.EvaluateStack(stack);
                         float_variables[tokens[0]] = float.Parse(result);
                     }
                     // Assign to existing bool variable
                     else if (bool_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateMathStack(stack);
+                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                        string result = MathFunctions.EvaluateStack(stack);
                         bool_variables[tokens[0]] = bool.Parse(result);
                     }
+
                     // MATH command → evaluate expression
                     else if (tokens[0] == "math" && tokens.Length > 1)
                     {
-                        var stack = MathFunctions.MakeMathStack(tokens.Skip(1));
-                        Console.WriteLine(MathFunctions.EvaluateMathStack(stack));
+                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                        Console.WriteLine(MathFunctions.EvaluateStack(stack));
                     }
+
                     // COMMENT line → skip
                     else if (tokens[0].StartsWith("//"))
                     {
                         continue;
                     }
+
                     // EXIT command → stop interpreter
                     else if (tokens[0] == "exit")
                     {

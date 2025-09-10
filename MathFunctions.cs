@@ -10,16 +10,28 @@
             float op1 = float.Parse(operand1);
             float op2 = float.Parse(operand2);
 
-            if (operation == "/") return (op1 / op2).ToString();
-            if (operation == "*") return (op1 * op2).ToString();
-            if (operation == "+") return (op1 + op2).ToString();
-            if (operation == "-") return (op1 - op2).ToString();
-            if (operation == "^") return Math.Pow(op1, op2).ToString();
+            switch (operation)
+            {
+                case "/" when op2 == 0:
+                    throw new DivideByZeroException("Error: Division by zero.");
+                case "/":
+                    return (op1 / op2).ToString();
+                case "*" :
+                    return (op1 * op2).ToString();
+                case "+" :
+                    return (op1 + op2).ToString();
+                case "-" :
+                    return (op1 - op2).ToString();
+                case "^" :
+                    return Math.Pow(op1, op2).ToString();
+                default:
+                    throw new InvalidOperationException($"Error: Unknown operation '{operation}'.");
+            }
 
             return "";
         }
 
-       /// <summary>
+        /// <summary>
         /// Performs boolean operations: &&, ||, ==, !=, xor
         /// </summary>
         public static string operateBool(string operand1, string operation, string operand2)
@@ -27,11 +39,21 @@
             bool op1 = bool.Parse(operand1);
             bool op2 = bool.Parse(operand2);
 
-            if (operation == "&&") return (op1 && op2).ToString().ToLower();
-            if (operation == "||") return (op1 || op2).ToString().ToLower();
-            if (operation == "==") return (op1 == op2).ToString().ToLower();
-            if (operation == "!=") return (op1 != op2).ToString().ToLower();
-            if (operation == "xor") return (op1 ^ op2).ToString().ToLower();
+            switch (operation)
+            {
+                case "&&":
+                    return (op1 && op2).ToString().ToLower();
+                case "||":
+                    return (op1 || op2).ToString().ToLower();
+                case "==":
+                    return (op1 == op2).ToString().ToLower();
+                case "!=":
+                    return (op1 != op2).ToString().ToLower();
+                case "xor":
+                    return (op1 ^ op2).ToString().ToLower();
+                default:
+                    throw new InvalidOperationException($"Error: Unknown boolean operation '{operation}'.");
+            }
 
             return "";
         }
@@ -63,7 +85,7 @@
         /// Builds a math/logic stack from tokens
         /// Converts variables to values, keeps operators
         /// </summary>
-        public static List<string> MakeMathStack(IEnumerable<string> tokens)
+        public static List<string> MakeStack(IEnumerable<string> tokens)
         {
             List<string> stack = new List<string>();
 
@@ -91,7 +113,7 @@
         /// Evaluates a stack until a single result remains
         /// Automatically chooses arithmetic or boolean operation
         /// </summary>
-        public static string EvaluateMathStack(List<string> stack)
+        public static string EvaluateStack(List<string> stack)
         {
             int operationPosition = findOperation(stack);
 
