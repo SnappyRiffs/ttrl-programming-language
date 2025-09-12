@@ -1,10 +1,10 @@
 ﻿namespace TTRL
 {
-    class App
+    static class App
     {
-        public App()
+        public static void Main(string[] args)
         {
-            Interpreter.Start();
+            Interpreter.Start(args[0]);
             Console.ReadLine();
         }
     }

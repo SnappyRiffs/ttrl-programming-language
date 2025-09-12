@@ -1,60 +1,58 @@
-﻿
-using System;
-using System.Diagnostics.Tracing;
-using System.Linq;
-using System.Numerics;
+﻿using System.Text.RegularExpressions;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace TTRL
 {
-    static class Interpreter
+    static class Functions
     {
-
-        public static Dictionary<string, string> string_variables = new Dictionary<string, string>();
-        public static Dictionary<string, int> int_variables = new Dictionary<string, int>();
-        public static Dictionary<string, float> float_variables = new Dictionary<string, float>();
-        public static Dictionary<string, string[]> functions = new Dictionary<string, string[]>();
-        public static Dictionary<string, string[]> function_args = new Dictionary<string, string[]>();
-
-        public static bool devmode = false;
-        public static int line_counter = 0;
-
-        public static void Start(string filePath)
+        public static void MakeFunction(string[] tokens, Dictionary<string, string[]> functions, string[] lines, Dictionary<string, string[]> function_args)
         {
-            Console.WriteLine("started interpreter");
-            string[] lines = { };
-            try
+            string function_name = tokens[1];
+            string arguments = string.Join("", tokens[2..^0]);
+            char[] parens = { '(', ')' };
+            arguments = arguments.Trim(parens);
+            string[] argument_list = arguments.Split(",");
+            function_args[function_name] = argument_list;
+            string[] remaining_lines = lines[Interpreter.line_counter..^0];
+            string pat = @"\{(.*?)\}";
+            Regex r = new Regex(pat, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            Match m = r.Match(string.Join("\n", remaining_lines));
+            if (m.Success)
             {
-                lines = File.ReadAllLines(filePath);
-                if (devmode)
-                {
-                    Console.WriteLine("read lines of file : " + filePath);
-                }
+                string Function_Contents = m.Groups[1].Captures[0].ToString();
+                functions[function_name] = Function_Contents.Split("\n");
+                int count = Regex.Matches(Function_Contents, "\n").Count;
+                Interpreter.line_counter = Interpreter.line_counter + count;
             }
-            catch
+            else
             {
-                Console.WriteLine("Error reading file");
+                Console.WriteLine("Start delimiter not found.");
             }
-           
-            for (line_counter = 0; line_counter < lines.Length; line_counter++)
+        }
+
+        public static void CallFunction(string[] lines)
+        {
+            for (int line_counter = 0; line_counter < lines.Length; line_counter++)
             {
                 string line = lines[line_counter].Trim();
                 string[] tokens = line.Split(' ');
                 if (tokens.Length > 0)
                 {
+
                     if (tokens[0] == "print")
                     {
                         string result;
-                        if (string_variables.ContainsKey(tokens[1]))
+                        if (Interpreter.string_variables.ContainsKey(tokens[1]))
                         {
-                            result = string_variables[tokens[1]];
+                            result = Interpreter.string_variables[tokens[1]];
                         }
-                        else if (int_variables.ContainsKey(tokens[1]))
+                        else if (Interpreter.int_variables.ContainsKey(tokens[1]))
                         {
-                            result = int_variables[tokens[1]].ToString();
+                            result = Interpreter.int_variables[tokens[1]].ToString();
                         }
-                        else if (float_variables.ContainsKey(tokens[1]))
+                        else if (Interpreter.float_variables.ContainsKey(tokens[1]))
                         {
-                            result = float_variables[tokens[1]].ToString();
+                            result = Interpreter.float_variables[tokens[1]].ToString();
                         }
                         else
                         {
@@ -67,84 +65,77 @@ namespace TTRL
                     {
                         var ToJoin = tokens.Skip(2);
                         string joined = string.Join(" ", ToJoin);
-                        string_variables.Add(tokens[1], joined);
+                        Interpreter.string_variables.Add(tokens[1], joined);
                     }
                     else if (tokens[0] == "int")
                     {
                         List<string> stack = MathFunctions.MakeMathStack(tokens.Skip(2));
                         string result = MathFunctions.EvaluateMathStack(stack);
-                        int_variables.Add(tokens[1], int.Parse(result));
+                        Interpreter.int_variables.Add(tokens[1], int.Parse(result));
                     }
                     else if (tokens[0] == "float")
                     {
                         List<string> stack = MathFunctions.MakeMathStack(tokens.Skip(2));
                         string result = MathFunctions.EvaluateMathStack(stack);
-                        float_variables.Add(tokens[1], float.Parse(result));
+                        Interpreter.float_variables.Add(tokens[1], float.Parse(result));
                     }
                     // Keys Section
-                    else if (string_variables.ContainsKey(tokens[0]))
+                    else if (Interpreter.string_variables.ContainsKey(tokens[0]))
                     {
                         var ToSet = tokens.Skip(1);
                         string joined = string.Join(" ", ToSet);
-                        string_variables[tokens[0]] = joined;
+                        Interpreter.string_variables[tokens[0]] = joined;
                     }
-                    else if (int_variables.ContainsKey(tokens[0]))
+                    else if (Interpreter.int_variables.ContainsKey(tokens[0]))
                     {
                         if (tokens[1].Equals("++"))
                         {
-                            int_variables[tokens[0]] = int_variables[tokens[0]] + 1;
+                            Interpreter.int_variables[tokens[0]] = Interpreter.int_variables[tokens[0]] + 1;
                         }
                         else
                         {
                             List<string> stack = MathFunctions.MakeMathStack(tokens.Skip(1));
                             string result = MathFunctions.EvaluateMathStack(stack);
-                            int_variables[tokens[0]] = int.Parse(result);
+                            Interpreter.int_variables[tokens[0]] = int.Parse(result);
                         }
                     }
-                    else if (float_variables.ContainsKey(tokens[0]))
+                    else if (Interpreter.float_variables.ContainsKey(tokens[0]))
                     {
                         if (tokens[1].Equals("++"))
                         {
-                            float_variables[tokens[0]] = float_variables[tokens[0]] + 1;
+                            Interpreter.float_variables[tokens[0]] = Interpreter.float_variables[tokens[0]] + 1;
                         }
                         else
                         {
                             List<string> stack = MathFunctions.MakeMathStack(tokens.Skip(1));
                             string result = MathFunctions.EvaluateMathStack(stack);
-                            float_variables[tokens[0]] = float.Parse(result);
+                            Interpreter.float_variables[tokens[0]] = float.Parse(result);
                         }
-                       
+
                     }
-                    else if (functions.ContainsKey(tokens[0]))
+                    else if (Interpreter.functions.ContainsKey(tokens[0]))
                     {
                         string arguments = string.Join("", tokens[1..^0]);
                         char[] parens = { '(', ')' };
                         arguments = arguments.Trim(parens);
                         string[] argument_list = arguments.Split(",");
                         int counter = 0;
-                        foreach (string arg in function_args[tokens[0]])
+                        foreach (string arg in Interpreter.function_args[tokens[0]])
                         {
                             float parsed;
                             float.TryParse(argument_list[counter], out parsed);
-                            float_variables[arg] = parsed;
+                            Interpreter.float_variables[arg] = parsed;
+                            Console.WriteLine(string.Join(", ", Interpreter.float_variables[arg]));
+                            Environment.Exit(0);
                             counter++;
                         }
-                        Functions.CallFunction(functions[tokens[0]]);
-                    }
-                    // End Keys Section
-                    else if (tokens[0].Equals("function"))
-                    {
-                        Functions.MakeFunction(tokens, functions, lines, function_args);
+                        Functions.CallFunction(Interpreter.functions[tokens[0]]);
                     }
                     else if (tokens[0] == "math")
                     {
                         List<string> stack = MathFunctions.MakeMathStack(tokens);
                         Console.WriteLine(MathFunctions.EvaluateMathStack(stack));
 
-                    }
-                    else if (tokens[0] == "devmode")
-                    {
-                        devmode = true;
                     }
                     else if (tokens[0].StartsWith("//") || tokens[0].StartsWith("//"))
                     {
