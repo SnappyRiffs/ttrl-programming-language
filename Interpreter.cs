@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Linq;
-using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
 namespace TTRL
 {
+    public class IncompatibleParamTypeError : Exception
+    {
+        public IncompatibleParamTypeError(string message) : base(message) { }
+    }
+
     static class Interpreter
     {
         // Dictionaries for each variable type
@@ -15,13 +19,13 @@ namespace TTRL
         public static Dictionary<string, float> float_variables = new();
         public static Dictionary<string, bool> bool_variables = new();
 
-        // Store functions
-        public static Dictionary<string, (List<string> parameters, List<string> body)> functions = new();
+        // Store functions: Name -> (ReturnType, Parameters, Body)
+        public static Dictionary<string, (string ReturnType, List<(string Name, string Type)> Parameters, List<string> Body)> functions = new();
 
         public static void Start()
         {
             List<string> Files = new List<string>();
-            Console.WriteLine("started interpreter");
+            Console.WriteLine("Started interpreter");
 
             // Read path.cfg to get script directories
             string[] conflines = File.ReadAllLines("path.cfg");
@@ -46,23 +50,63 @@ namespace TTRL
                 string code = File.ReadAllText(Path.Combine(file, "main.ttrl"));
 
                 // --- FUNCTION PARSING ---
-                var matches = Regex.Matches(code, @"func\s+(\w+)\((.*?)\)\s*\{([\s\S]*?)\}");
+                var matches = Regex.Matches(code, @"func:\s*(\w+)\s+(\w+)\((.*?)\)\s*\{([\s\S]*?)\}");
                 foreach (Match m in matches)
                 {
-                    string funcName = m.Groups[1].Value;
-                    string paramList = m.Groups[2].Value.Trim();
-                    string funcBody = m.Groups[3].Value.Trim();
+                    // Group 1 from the regex captures the return type of the function.
+                    // Example: "int" in "func: int add(a: int, b: int) { ... }"
+                    string returnType = m.Groups[1].Value;
 
+                    // Group 2 captures the function name.
+                    // Example: "add" in "func: int add(a: int, b: int) { ... }"
+                    string funcName = m.Groups[2].Value;
+
+                    // Group 3 captures the parameter list inside the parentheses.
+                    // Example: "a: int, b: int" in "func: int add(a: int, b: int) { ... }"
+                    // Trim() removes any leading or trailing whitespace.
+                    string paramList = m.Groups[3].Value.Trim();
+
+                    // Group 4 captures the function body inside the curly braces.
+                    // Example: "return a + b" in the add function.
+                    // Trim() removes leading/trailing whitespace from the whole body string.
+                    string funcBody = m.Groups[4].Value.Trim();
+
+
+                    // Check if the parameter list is not empty
                     var parameters = paramList.Length > 0
-                        ? paramList.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                .Select(p => p.Trim()).ToList()
-                        : new List<string>();
+                        ? paramList
+                            // Split the parameters by comma (a: int, b: int → ["a: int", "b: int"])
+                            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            // For each parameter, process it into a (Name, Type) tuple
+                            .Select(p => {
+                                // Split the parameter by ':' into name and type (e.g., "a: int" → ["a", " int"])
+                                var parts = p.Split(':', 2);
+                                // Trim whitespace and return a tuple with Name and Type
+                                return (Name: parts[0].Trim(), Type: parts[1].Trim());
+                            })
+                            // Convert the IEnumerable of tuples into a List
+                            .ToList()
+                        // If there are no parameters, create an empty list
+                        : new List<(string Name, string Type)>();
 
-                    functions[funcName] = (parameters, funcBody.Split('\n').Select(l => l.Trim()).ToList());
+                    // Store the parsed function in the 'functions' dictionary
+                    // Key: funcName (e.g., "add")
+                    // Value: a tuple containing:
+                    //   ReturnType: the return type of the function (e.g., "int")
+                    //   Parameters: the list of (Name, Type) tuples parsed above
+                    //   Body: list of lines in the function body, each trimmed of whitespace
+                    functions[funcName] = (
+                        ReturnType: returnType,
+                        Parameters: parameters,
+                        Body: funcBody.Split('\n')
+                                    .Select(l => l.Trim())
+                                    .ToList()
+                    );
+
                 }
 
                 // Remove function definitions from the main execution
-                string codeNoFuncs = Regex.Replace(code, @"func\s+\w+\([^)]*\)\s*\{[\s\S]*?\}", "");
+                string codeNoFuncs = Regex.Replace(code, @"func:\s*(\w+)\s+(\w+)\((.*?)\)\s*\{([\s\S]*?)\}", "");
 
                 // Now process line by line
                 string[] lines = codeNoFuncs.Split('\n');
@@ -98,111 +142,41 @@ namespace TTRL
                     result = string.Join(' ', tokens.Skip(1));
 
                 Console.WriteLine(result);
-            }
-
-            // STRING declaration
-            else if (tokens[0] == "string" && tokens.Length > 2)
-            {
-                string_variables[tokens[1]] = string.Join(" ", tokens.Skip(2));
-            }
-
-            // INT declaration
-            else if (tokens[0] == "int" && tokens.Length > 2)
-            {
-                var stack = MathFunctions.MakeStack(tokens.Skip(2));
-                string result = MathFunctions.EvaluateStack(stack);
-                int_variables[tokens[1]] = int.Parse(result);
-            }
-
-            // FLOAT declaration
-            else if (tokens[0] == "float" && tokens.Length > 2)
-            {
-                var stack = MathFunctions.MakeStack(tokens.Skip(2));
-                string result = MathFunctions.EvaluateStack(stack);
-                float_variables[tokens[1]] = float.Parse(result);
-            }
-
-            // BOOL declaration
-            else if (tokens[0] == "bool" && tokens.Length > 1)
-            {
-                var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                string result = MathFunctions.EvaluateStack(stack);
-                bool_variables[tokens[1]] = bool.Parse(result);
-            }
-
-            // Assign to existing int variable
-            else if (int_variables.ContainsKey(tokens[0]) ||
-                     (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && int_variables.ContainsKey(tokens[1])))
-            {
-                if (int_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
-                {
-                    if (tokens[1] == "++") int_variables[tokens[0]]++;
-                    else if (tokens[1] == "--") int_variables[tokens[0]]--;
-                }
-                else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && int_variables.ContainsKey(tokens[1]))
-                {
-                    if (tokens[0] == "++") int_variables[tokens[1]]++;
-                    else if (tokens[0] == "--") int_variables[tokens[1]]--;
-                }
-                else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                {
-                    var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                    string result = MathFunctions.EvaluateStack(stack);
-                    int_variables[tokens[0]] = int.Parse(result);
-                }
-            }
-
-            // Assign to existing float variable
-            else if (float_variables.ContainsKey(tokens[0]) ||
-                     (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && float_variables.ContainsKey(tokens[1])))
-            {
-                if (float_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
-                {
-                    if (tokens[1] == "++") float_variables[tokens[0]]++;
-                    else if (tokens[1] == "--") float_variables[tokens[0]]--;
-                }
-                else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && float_variables.ContainsKey(tokens[1]))
-                {
-                    if (tokens[0] == "++") float_variables[tokens[1]]++;
-                    else if (tokens[0] == "--") float_variables[tokens[1]]--;
-                }
-                else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                {
-                    var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                    string result = MathFunctions.EvaluateStack(stack);
-                    float_variables[tokens[0]] = float.Parse(result);
-                }
-            }
-
-            // Assign to existing string variable
-            else if (string_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-            {
-                string_variables[tokens[0]] = string.Join(" ", tokens.Skip(1));
-            }
-
-            // Assign to existing bool variable
-            else if (bool_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-            {
-                var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                string result = MathFunctions.EvaluateStack(stack);
-                bool_variables[tokens[0]] = bool.Parse(result);
-            }
-
-            // MATH command
-            else if (tokens[0] == "math" && tokens.Length > 1)
-            {
-                var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                Console.WriteLine(MathFunctions.EvaluateStack(stack));
-            }
-
-            // COMMENT line
-            else if (tokens[0].StartsWith("//"))
-            {
                 return;
             }
 
-            // FUNCTION CALL with optional arguments
-            else if (line.Contains("(") && line.EndsWith(")"))
+            // VARIABLE DECLARATIONS
+            if (tokens.Length > 2 && (tokens[0] == "string" || tokens[0] == "int" || tokens[0] == "float" || tokens[0] == "bool"))
+            {
+                string varName = tokens[1];
+                string valueStr = string.Join(' ', tokens.Skip(2));
+
+                switch (tokens[0])
+                {
+                    case "string":
+                        string_variables[varName] = valueStr;
+                        break;
+
+                    case "int":
+                        int_variables[varName] = int.Parse(valueStr);
+                        break;
+
+                    case "float":
+                        float_variables[varName] = float.Parse(valueStr);
+                        break;
+
+                    case "bool":
+                        bool_variables[varName] = bool.Parse(valueStr);
+                        break;
+                }
+                return;
+            }
+
+            // COMMENT
+            if (tokens[0].StartsWith("//")) return;
+
+            // FUNCTION CALL
+            if (line.Contains("(") && line.EndsWith(")"))
             {
                 string funcName = line.Substring(0, line.IndexOf("("));
                 string argsPart = line.Substring(line.IndexOf("(") + 1, line.Length - funcName.Length - 2);
@@ -211,45 +185,71 @@ namespace TTRL
                     ? argsPart.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
                     : new List<string>();
 
-                if (functions.ContainsKey(funcName))
+                if (!functions.ContainsKey(funcName))
+                    throw new Exception($"Function '{funcName}' not found.");
+
+                var (returnType, parameters, body) = functions[funcName];
+
+                if (args.Count != parameters.Count)
+                    throw new Exception($"Function '{funcName}' expects {parameters.Count} arguments, got {args.Count}.");
+
+                // Typed enforcement
+                for (int i = 0; i < parameters.Count; i++)
                 {
-                    var (parameters, body) = functions[funcName];
+                    string paramName = parameters[i].Name;
+                    string paramType = parameters[i].Type;
+                    string argValue = args[i];
 
-                    // Map args to parameters (basic support: strings, numbers, vars)
-                    for (int i = 0; i < parameters.Count; i++)
+                    switch (paramType)
                     {
-                        string paramName = parameters[i];
-                        string argValue = (i < args.Count) ? args[i] : "";
+                        case "string":
+                            if (string_variables.ContainsKey(argValue))
+                                string_variables[paramName] = string_variables[argValue];
+                            else
+                                string_variables[paramName] = argValue;
+                            break;
+                        
+                        case "int":
+                            if (int.TryParse(argValue, out int intVal))
+                                int_variables[paramName] = intVal;
+                            else if (int_variables.ContainsKey(argValue))
+                                int_variables[paramName] = int_variables[argValue];
+                            else
+                                throw new IncompatibleParamTypeError($"Parameter '{paramName}' expects type 'int' but got '{argValue}'.");
+                            break;
+                        
+                        case "float":
+                            if (float.TryParse(argValue, out float floatVal))
+                                float_variables[paramName] = floatVal;
+                            else if (float_variables.ContainsKey(argValue))
+                                float_variables[paramName] = float_variables[argValue];
+                            else
+                                throw new IncompatibleParamTypeError($"Parameter '{paramName}' expects type 'float' but got '{argValue}'.");
+                            break;
 
-                        if (int.TryParse(argValue, out int intVal))
-                            int_variables[paramName] = intVal;
-                        else if (float.TryParse(argValue, out float floatVal))
-                            float_variables[paramName] = floatVal;
-                        else if (bool.TryParse(argValue, out bool boolVal))
-                            bool_variables[paramName] = boolVal;
-                        else if (string_variables.ContainsKey(argValue))
-                            string_variables[paramName] = string_variables[argValue];
-                        else if (int_variables.ContainsKey(argValue))
-                            int_variables[paramName] = int_variables[argValue];
-                        else if (float_variables.ContainsKey(argValue))
-                            float_variables[paramName] = float_variables[argValue];
-                        else if (bool_variables.ContainsKey(argValue))
-                            bool_variables[paramName] = bool_variables[argValue];
-                        else
-                            string_variables[paramName] = argValue; // default to string
-                    }
+                        case "bool":
+                            if (bool.TryParse(argValue, out bool boolVal))
+                                bool_variables[paramName] = boolVal;
+                            else if (bool_variables.ContainsKey(argValue))
+                                bool_variables[paramName] = bool_variables[argValue];
+                            else
+                                throw new IncompatibleParamTypeError($"Parameter '{paramName}' expects type 'bool' but got '{argValue}'.");
+                            break;
 
-                    // Execute function body
-                    foreach (var funcLine in body)
-                    {
-                        ExecuteLine(funcLine);
+                        default:
+                            throw new Exception($"Unknown parameter type '{paramType}' for '{paramName}'.");
                     }
                 }
-            }
-            
 
-            // EXIT command
-            else if (tokens[0] == "exit")
+                // Execute function body
+                foreach (var funcLine in body)
+                    ExecuteLine(funcLine);
+
+                return;
+            }
+
+            // EXIT
+            if (tokens[0] == "exit")
             {
                 Environment.Exit(0);
             }
