@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace TTRL
 {
@@ -12,11 +13,13 @@ namespace TTRL
         public static Dictionary<string, string> string_variables = new();
         public static Dictionary<string, int> int_variables = new();
         public static Dictionary<string, float> float_variables = new();
-        public static Dictionary<string, bool> bool_variables = new(); // new bool dictionary
+        public static Dictionary<string, bool> bool_variables = new();
+
+        // Store functions
+        public static Dictionary<string, List<string>> functions = new();
 
         public static void Start()
         {
-            // List to store file paths from config
             List<string> Files = new List<string>();
             Console.WriteLine("started interpreter");
 
@@ -40,142 +43,172 @@ namespace TTRL
             // Loop through each file path
             foreach (string file in Files)
             {
-                string[] lines = File.ReadAllLines(Path.Combine(file, "main.ttrl"));
+                string code = File.ReadAllText(Path.Combine(file, "main.ttrl"));
 
-                foreach (string line in lines)
+                // --- FUNCTION PARSING ---
+                var matches = Regex.Matches(code, @"func\s+(\w+)\(\)\s*\{([\s\S]*?)\}");
+                foreach (Match m in matches)
                 {
-                    string[] tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (tokens.Length == 0) continue; // skip empty lines
+                    string funcName = m.Groups[1].Value;
+                    string funcBody = m.Groups[2].Value.Trim();
+                    functions[funcName] = funcBody.Split('\n').Select(l => l.Trim()).ToList();
+                }
 
-                    // --- COMMAND HANDLING ---
+                // Remove function definitions from the main execution
+                string codeNoFuncs = Regex.Replace(code, @"func\s+\w+\(\)\s*\{[\s\S]*?\}", "");
 
-                    // PRINT command → print variables or literal text
-                    if (tokens[0] == "print" && tokens.Length > 1)
-                    {
-                        string result;
-                        if (string_variables.ContainsKey(tokens[1]))
-                            result = string_variables[tokens[1]];
-                        else if (int_variables.ContainsKey(tokens[1]))
-                            result = int_variables[tokens[1]].ToString();
-                        else if (float_variables.ContainsKey(tokens[1]))
-                            result = float_variables[tokens[1]].ToString();
-                        else if (bool_variables.ContainsKey(tokens[1]))
-                            result = bool_variables[tokens[1]].ToString().ToLower();
-                        else
-                            result = string.Join(' ', tokens.Skip(1)); // print raw text
+                // Now process line by line
+                string[] lines = codeNoFuncs.Split('\n');
+                foreach (string rawLine in lines)
+                {
+                    ExecuteLine(rawLine.Trim());
+                }
+            }
+        }
 
-                        Console.WriteLine(result);
-                    }
+        private static void ExecuteLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return;
 
-                    // STRING declaration/assignment
-                    else if (tokens[0] == "string" && tokens.Length > 2)
-                    {
-                        string_variables[tokens[1]] = string.Join(" ", tokens.Skip(2));
-                    }
-                    // INT declaration/assignment
-                    else if (tokens[0] == "int" && tokens.Length > 2)
-                    {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(2));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        int_variables[tokens[1]] = int.Parse(result);
-                    }
-                    // FLOAT declaration/assignment
-                    else if (tokens[0] == "float" && tokens.Length > 2)
-                    {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(2));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        float_variables[tokens[1]] = float.Parse(result);
-                    }
-                    // BOOL declaration/assignment
-                    else if (tokens[0] == "bool" && tokens.Length > 1)
-                    {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        bool_variables[tokens[1]] = bool.Parse(result); // parse string "true"/"false"
-                    }
+            string[] tokens = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0) return;
 
-                    // Assign to existing string variable
-                    else if (string_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                    {
-                        string_variables[tokens[0]] = string.Join(" ", tokens.Skip(1));
-                    }
-                    // Assign to existing int variable
-                    else if (int_variables.ContainsKey(tokens[0]) || 
-                            (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && int_variables.ContainsKey(tokens[1])))
-                    {
-                        // Postfix: x ++ / x --
-                        if (int_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
-                        {
-                            if (tokens[1] == "++") int_variables[tokens[0]]++;
-                            else if (tokens[1] == "--") int_variables[tokens[0]]--;
-                        }
-                        // Prefix: ++ x / -- x
-                        else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && int_variables.ContainsKey(tokens[1]))
-                        {
-                            if (tokens[0] == "++") int_variables[tokens[1]]++;
-                            else if (tokens[0] == "--") int_variables[tokens[1]]--;
-                        }
-                        // Normal assignment
-                        else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                        {
-                            var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                            string result = MathFunctions.EvaluateStack(stack);
-                            int_variables[tokens[0]] = int.Parse(result);
-                        }
-                    }
+            // --- COMMAND HANDLING ---
 
-                    // Assign to existing float variable
-                    else if (float_variables.ContainsKey(tokens[0]) || 
-                            (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && float_variables.ContainsKey(tokens[1])))
-                    {
-                        // Postfix: y ++ / y --
-                        if (float_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
-                        {
-                            if (tokens[1] == "++") float_variables[tokens[0]]++;
-                            else if (tokens[1] == "--") float_variables[tokens[0]]--;
-                        }
-                        // Prefix: ++ y / -- y
-                        else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && float_variables.ContainsKey(tokens[1]))
-                        {
-                            if (tokens[0] == "++") float_variables[tokens[1]]++;
-                            else if (tokens[0] == "--") float_variables[tokens[1]]--;
-                        }
-                        // Normal assignment
-                        else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                        {
-                            var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                            string result = MathFunctions.EvaluateStack(stack);
-                            float_variables[tokens[0]] = float.Parse(result);
-                        }
-                    }
+            // PRINT command
+            if (tokens[0] == "print" && tokens.Length > 1)
+            {
+                string result;
+                if (string_variables.ContainsKey(tokens[1]))
+                    result = string_variables[tokens[1]];
+                else if (int_variables.ContainsKey(tokens[1]))
+                    result = int_variables[tokens[1]].ToString();
+                else if (float_variables.ContainsKey(tokens[1]))
+                    result = float_variables[tokens[1]].ToString();
+                else if (bool_variables.ContainsKey(tokens[1]))
+                    result = bool_variables[tokens[1]].ToString().ToLower();
+                else
+                    result = string.Join(' ', tokens.Skip(1));
 
+                Console.WriteLine(result);
+            }
 
-                    // Assign to existing bool variable
-                    else if (bool_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
-                    {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        bool_variables[tokens[0]] = bool.Parse(result);
-                    }
+            // STRING declaration
+            else if (tokens[0] == "string" && tokens.Length > 2)
+            {
+                string_variables[tokens[1]] = string.Join(" ", tokens.Skip(2));
+            }
 
-                    // MATH command → evaluate expression
-                    else if (tokens[0] == "math" && tokens.Length > 1)
-                    {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                        Console.WriteLine(MathFunctions.EvaluateStack(stack));
-                    }
+            // INT declaration
+            else if (tokens[0] == "int" && tokens.Length > 2)
+            {
+                var stack = MathFunctions.MakeStack(tokens.Skip(2));
+                string result = MathFunctions.EvaluateStack(stack);
+                int_variables[tokens[1]] = int.Parse(result);
+            }
 
-                    // COMMENT line → skip
-                    else if (tokens[0].StartsWith("//"))
-                    {
-                        continue;
-                    }
+            // FLOAT declaration
+            else if (tokens[0] == "float" && tokens.Length > 2)
+            {
+                var stack = MathFunctions.MakeStack(tokens.Skip(2));
+                string result = MathFunctions.EvaluateStack(stack);
+                float_variables[tokens[1]] = float.Parse(result);
+            }
 
-                    // EXIT command → stop interpreter
-                    else if (tokens[0] == "exit")
+            // BOOL declaration
+            else if (tokens[0] == "bool" && tokens.Length > 1)
+            {
+                var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                string result = MathFunctions.EvaluateStack(stack);
+                bool_variables[tokens[1]] = bool.Parse(result);
+            }
+
+            // Assign to existing int variable
+            else if (int_variables.ContainsKey(tokens[0]) ||
+                     (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && int_variables.ContainsKey(tokens[1])))
+            {
+                if (int_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
+                {
+                    if (tokens[1] == "++") int_variables[tokens[0]]++;
+                    else if (tokens[1] == "--") int_variables[tokens[0]]--;
+                }
+                else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && int_variables.ContainsKey(tokens[1]))
+                {
+                    if (tokens[0] == "++") int_variables[tokens[1]]++;
+                    else if (tokens[0] == "--") int_variables[tokens[1]]--;
+                }
+                else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                {
+                    var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                    string result = MathFunctions.EvaluateStack(stack);
+                    int_variables[tokens[0]] = int.Parse(result);
+                }
+            }
+
+            // Assign to existing float variable
+            else if (float_variables.ContainsKey(tokens[0]) ||
+                     (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && float_variables.ContainsKey(tokens[1])))
+            {
+                if (float_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
+                {
+                    if (tokens[1] == "++") float_variables[tokens[0]]++;
+                    else if (tokens[1] == "--") float_variables[tokens[0]]--;
+                }
+                else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && float_variables.ContainsKey(tokens[1]))
+                {
+                    if (tokens[0] == "++") float_variables[tokens[1]]++;
+                    else if (tokens[0] == "--") float_variables[tokens[1]]--;
+                }
+                else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                {
+                    var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                    string result = MathFunctions.EvaluateStack(stack);
+                    float_variables[tokens[0]] = float.Parse(result);
+                }
+            }
+
+            // Assign to existing string variable
+            else if (string_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+            {
+                string_variables[tokens[0]] = string.Join(" ", tokens.Skip(1));
+            }
+
+            // Assign to existing bool variable
+            else if (bool_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+            {
+                var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                string result = MathFunctions.EvaluateStack(stack);
+                bool_variables[tokens[0]] = bool.Parse(result);
+            }
+
+            // MATH command
+            else if (tokens[0] == "math" && tokens.Length > 1)
+            {
+                var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                Console.WriteLine(MathFunctions.EvaluateStack(stack));
+            }
+
+            // COMMENT line
+            else if (tokens[0].StartsWith("//"))
+            {
+                return;
+            }
+
+            // EXIT command
+            else if (tokens[0] == "exit")
+            {
+                Environment.Exit(0);
+            }
+
+            // FUNCTION CALL
+            else if (tokens[0].EndsWith("()"))
+            {
+                string funcName = tokens[0].Replace("()", "");
+                if (functions.ContainsKey(funcName))
+                {
+                    foreach (var funcLine in functions[funcName])
                     {
-                        Environment.Exit(0); // stops whole program
-                        // return; // alternative to stop only this script
+                        ExecuteLine(funcLine);
                     }
                 }
             }
