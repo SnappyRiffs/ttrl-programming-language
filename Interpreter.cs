@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace TTRL
 {
+    [Serializable]
     public class IncompatibleParamTypeError : Exception
     {
         public IncompatibleParamTypeError(string message) : base(message) { }
@@ -71,7 +72,6 @@ namespace TTRL
                     // Trim() removes leading/trailing whitespace from the whole body string.
                     string funcBody = m.Groups[4].Value.Trim();
 
-
                     // Check if the parameter list is not empty
                     var parameters = paramList.Length > 0
                         ? paramList
@@ -102,7 +102,6 @@ namespace TTRL
                                     .Select(l => l.Trim())
                                     .ToList()
                     );
-
                 }
 
                 // Remove function definitions from the main execution
@@ -173,7 +172,7 @@ namespace TTRL
             }
 
             // COMMENT
-            if (tokens[0].StartsWith("//")) return;
+            if (tokens[0].StartsWith("//") || tokens[0].StartsWith("///")) return;
 
             // FUNCTION CALL
             if (line.Contains("(") && line.EndsWith(")"))
