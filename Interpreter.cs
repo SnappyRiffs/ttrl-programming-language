@@ -7,6 +7,9 @@ using System.Text.RegularExpressions;
 namespace TTRL
 {
     [Serializable]
+    /// <summary>
+    /// Exception thrown when a function parameter type does not match the expected type.
+    /// </summary>
     public class IncompatibleParamTypeError : Exception
     {
         public IncompatibleParamTypeError(string message) : base(message) { }
