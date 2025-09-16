@@ -1,5 +1,14 @@
 ﻿namespace TTRL
 {
+    [Serializable]
+    /// <summary>
+    /// Thrown when an unknown operation is encountered.
+    /// </summary>
+    public class UnknownOperationError : Exception
+    {
+        public UnknownOperationError(string message) : base(message) { }
+    }
+
     static class MathFunctions
     {
         /// <summary>
@@ -25,14 +34,14 @@
                 case "^" :
                     return Math.Pow(op1, op2).ToString();
                 default:
-                    throw new InvalidOperationException($"Error: Unknown operation '{operation}'.");
+                    throw new UnknownOperationError($"Error: Unknown operation '{operation}'.");
             }
 
             return "";
         }
 
         /// <summary>
-        /// Performs boolean operations: &&, ||, ==, !=, xor
+        /// Performs boolean operations: &&, ||, ==, !=, ^
         /// </summary>
         public static string operateBool(string operand1, string operation, string operand2)
         {
@@ -49,10 +58,10 @@
                     return (op1 == op2).ToString().ToLower();
                 case "!=":
                     return (op1 != op2).ToString().ToLower();
-                case "xor":
+                case "^":
                     return (op1 ^ op2).ToString().ToLower();
                 default:
-                    throw new InvalidOperationException($"Error: Unknown boolean operation '{operation}'.");
+                    throw new UnknownOperationError($"Error: Unknown boolean operation '{operation}'.");
             }
 
             return "";
@@ -61,7 +70,7 @@
         /// <summary>
         /// Finds next operation in stack based on precedence.
         /// Arithmetic: ^ > * / > + - 
-        /// Boolean: && > || > == !=
+        /// Boolean: && > || > == != ^
         /// </summary>
         public static int findOperation(List<string> stack)
         {
@@ -70,7 +79,7 @@
             string[] low = { "+", "-" };
             string[] boolHigh = { "&&" };
             string[] boolMedium = { "||" };
-            string[] boolLow = { "==", "!=", "xor" };
+            string[] boolLow = { "==", "!=", "^" };
 
             foreach (string[] ops in new[] { high, medium, low, boolHigh, boolMedium, boolLow })
             {
@@ -92,7 +101,7 @@
             foreach (string token in tokens)
             {
                 // Operators
-                if (new[] { "+", "-", "*", "/", "^", "&&", "||", "==", "!=", "xor" }.Contains(token))
+                if (new[] { "+", "-", "*", "/", "^", "&&", "||", "==", "!=", "^" }.Contains(token))
                 {
                     stack.Add(token);
                 }
