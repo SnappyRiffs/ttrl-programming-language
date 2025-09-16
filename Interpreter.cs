@@ -100,19 +100,56 @@ namespace TTRL
                         string_variables[tokens[0]] = string.Join(" ", tokens.Skip(1));
                     }
                     // Assign to existing int variable
-                    else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                    else if (int_variables.ContainsKey(tokens[0]) || 
+                            (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && int_variables.ContainsKey(tokens[1])))
                     {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        int_variables[tokens[0]] = int.Parse(result);
+                        // Postfix: x ++ / x --
+                        if (int_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
+                        {
+                            if (tokens[1] == "++") int_variables[tokens[0]]++;
+                            else if (tokens[1] == "--") int_variables[tokens[0]]--;
+                        }
+                        // Prefix: ++ x / -- x
+                        else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && int_variables.ContainsKey(tokens[1]))
+                        {
+                            if (tokens[0] == "++") int_variables[tokens[1]]++;
+                            else if (tokens[0] == "--") int_variables[tokens[1]]--;
+                        }
+                        // Normal assignment
+                        else if (int_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                        {
+                            var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                            string result = MathFunctions.EvaluateStack(stack);
+                            int_variables[tokens[0]] = int.Parse(result);
+                        }
                     }
+
                     // Assign to existing float variable
-                    else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                    else if (float_variables.ContainsKey(tokens[0]) || 
+                            (tokens.Length == 2 && (tokens[0] == "++" || tokens[0] == "--") && float_variables.ContainsKey(tokens[1])))
                     {
-                        var stack = MathFunctions.MakeStack(tokens.Skip(1));
-                        string result = MathFunctions.EvaluateStack(stack);
-                        float_variables[tokens[0]] = float.Parse(result);
+                        // Postfix: y ++ / y --
+                        if (float_variables.ContainsKey(tokens[0]) && tokens.Length == 2)
+                        {
+                            if (tokens[1] == "++") float_variables[tokens[0]]++;
+                            else if (tokens[1] == "--") float_variables[tokens[0]]--;
+                        }
+                        // Prefix: ++ y / -- y
+                        else if ((tokens[0] == "++" || tokens[0] == "--") && tokens.Length == 2 && float_variables.ContainsKey(tokens[1]))
+                        {
+                            if (tokens[0] == "++") float_variables[tokens[1]]++;
+                            else if (tokens[0] == "--") float_variables[tokens[1]]--;
+                        }
+                        // Normal assignment
+                        else if (float_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
+                        {
+                            var stack = MathFunctions.MakeStack(tokens.Skip(1));
+                            string result = MathFunctions.EvaluateStack(stack);
+                            float_variables[tokens[0]] = float.Parse(result);
+                        }
                     }
+
+
                     // Assign to existing bool variable
                     else if (bool_variables.ContainsKey(tokens[0]) && tokens.Length > 1)
                     {
