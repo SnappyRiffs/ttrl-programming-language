@@ -16,7 +16,7 @@ namespace TTRL
         public static Dictionary<string, bool> bool_variables = new();
 
         // Store functions
-        public static Dictionary<string, List<string>> functions = new();
+        public static Dictionary<string, (List<string> parameters, List<string> body)> functions = new();
 
         public static void Start()
         {
@@ -46,16 +46,23 @@ namespace TTRL
                 string code = File.ReadAllText(Path.Combine(file, "main.ttrl"));
 
                 // --- FUNCTION PARSING ---
-                var matches = Regex.Matches(code, @"func\s+(\w+)\(\)\s*\{([\s\S]*?)\}");
+                var matches = Regex.Matches(code, @"func\s+(\w+)\((.*?)\)\s*\{([\s\S]*?)\}");
                 foreach (Match m in matches)
                 {
                     string funcName = m.Groups[1].Value;
-                    string funcBody = m.Groups[2].Value.Trim();
-                    functions[funcName] = funcBody.Split('\n').Select(l => l.Trim()).ToList();
+                    string paramList = m.Groups[2].Value.Trim();
+                    string funcBody = m.Groups[3].Value.Trim();
+
+                    var parameters = paramList.Length > 0
+                        ? paramList.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(p => p.Trim()).ToList()
+                        : new List<string>();
+
+                    functions[funcName] = (parameters, funcBody.Split('\n').Select(l => l.Trim()).ToList());
                 }
 
                 // Remove function definitions from the main execution
-                string codeNoFuncs = Regex.Replace(code, @"func\s+\w+\(\)\s*\{[\s\S]*?\}", "");
+                string codeNoFuncs = Regex.Replace(code, @"func\s+\w+\([^)]*\)\s*\{[\s\S]*?\}", "");
 
                 // Now process line by line
                 string[] lines = codeNoFuncs.Split('\n');
@@ -194,23 +201,57 @@ namespace TTRL
                 return;
             }
 
-            // EXIT command
-            else if (tokens[0] == "exit")
+            // FUNCTION CALL with optional arguments
+            else if (line.Contains("(") && line.EndsWith(")"))
             {
-                Environment.Exit(0);
-            }
+                string funcName = line.Substring(0, line.IndexOf("("));
+                string argsPart = line.Substring(line.IndexOf("(") + 1, line.Length - funcName.Length - 2);
 
-            // FUNCTION CALL
-            else if (tokens[0].EndsWith("()"))
-            {
-                string funcName = tokens[0].Replace("()", "");
+                var args = argsPart.Length > 0
+                    ? argsPart.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(a => a.Trim()).ToList()
+                    : new List<string>();
+
                 if (functions.ContainsKey(funcName))
                 {
-                    foreach (var funcLine in functions[funcName])
+                    var (parameters, body) = functions[funcName];
+
+                    // Map args to parameters (basic support: strings, numbers, vars)
+                    for (int i = 0; i < parameters.Count; i++)
+                    {
+                        string paramName = parameters[i];
+                        string argValue = (i < args.Count) ? args[i] : "";
+
+                        if (int.TryParse(argValue, out int intVal))
+                            int_variables[paramName] = intVal;
+                        else if (float.TryParse(argValue, out float floatVal))
+                            float_variables[paramName] = floatVal;
+                        else if (bool.TryParse(argValue, out bool boolVal))
+                            bool_variables[paramName] = boolVal;
+                        else if (string_variables.ContainsKey(argValue))
+                            string_variables[paramName] = string_variables[argValue];
+                        else if (int_variables.ContainsKey(argValue))
+                            int_variables[paramName] = int_variables[argValue];
+                        else if (float_variables.ContainsKey(argValue))
+                            float_variables[paramName] = float_variables[argValue];
+                        else if (bool_variables.ContainsKey(argValue))
+                            bool_variables[paramName] = bool_variables[argValue];
+                        else
+                            string_variables[paramName] = argValue; // default to string
+                    }
+
+                    // Execute function body
+                    foreach (var funcLine in body)
                     {
                         ExecuteLine(funcLine);
                     }
                 }
+            }
+            
+
+            // EXIT command
+            else if (tokens[0] == "exit")
+            {
+                Environment.Exit(0);
             }
         }
     }
